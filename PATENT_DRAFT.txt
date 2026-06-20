@@ -1,0 +1,195 @@
+================================================================
+ PATENT APPLICATION DRAFT
+ Title: ADAPTIVE LOG-LOSS WEIGHTED ENSEMBLE (ALLWE) SYSTEM
+        FOR PROBABILISTIC EMAIL SPAM DETECTION WITH
+        REAL-TIME EXPLAINABILITY
+================================================================
+
+FIELD OF THE INVENTION
+
+This invention relates to email filtering systems, and more
+particularly to a novel hybrid machine learning ensemble
+architecture that employs adaptive log-loss minimization
+for weight optimization across heterogeneous classifiers,
+combined with a real-time explainability layer for
+transparent spam probability estimation.
+
+----------------------------------------------------------------
+BACKGROUND OF THE INVENTION
+----------------------------------------------------------------
+
+Existing spam detection systems suffer from three key
+limitations:
+
+1. SINGLE-MODEL RELIANCE: Most deployed spam filters
+   (SpamAssassin, Naive Bayes-only filters) rely on a single
+   classification algorithm, failing to exploit the diverse
+   statistical properties of different learning paradigms.
+
+2. ACCURACY-ONLY OPTIMIZATION: Conventional systems optimize
+   for binary accuracy, ignoring the calibration quality of
+   predicted probabilities. This leads to overconfident
+   misclassifications — a model may predict 99.9% spam
+   confidence on a legitimate email, causing false positives
+   with no calibration signal.
+
+3. BLACK-BOX DECISIONS: Existing ensemble methods (voting,
+   stacking) assign weights heuristically or via accuracy,
+   not via a proper scoring rule that rewards probability
+   calibration (such as log-loss / Brier Score).
+
+There is therefore a need for a spam detection system that:
+ (a) Combines diverse ML models under a unified probabilistic
+     framework;
+ (b) Optimizes ensemble combination weights using a proper
+     scoring rule (log-loss minimization);
+ (c) Provides human-interpretable explanations for each
+     classification decision.
+
+----------------------------------------------------------------
+SUMMARY OF THE INVENTION
+----------------------------------------------------------------
+
+The present invention provides the ALLWE (Adaptive Log-Loss
+Weighted Ensemble) architecture, comprising:
+
+  Claim 1 — CORE ARCHITECTURE (ALLWE)
+  A computer-implemented method for spam detection comprising:
+    (a) Receiving textual input (email, SMS, or message);
+    (b) Preprocessing via TF-IDF vectorization with bigrams;
+    (c) Generating spam probability estimates from four
+        heterogeneous ML classifiers:
+          - Multinomial Naive Bayes (NB)
+          - L2-Regularized Logistic Regression (LR)
+          - Isotonic-Calibrated Random Forest (RF)
+          - Early-Stopped Gradient Boosting (GB)
+    (d) Computing a weighted ensemble probability using
+        weights W = [w_NB, w_LR, w_RF, w_GB] optimized by
+        minimizing binary cross-entropy (log-loss) on a
+        held-out validation set:
+          min_W { -(1/N) Σ [y_i log(p_i) + (1-y_i)log(1-p_i)] }
+        subject to: Σ w_k = 1, w_k ≥ 0
+    (e) Classifying as SPAM if ensemble probability ≥ threshold τ
+    (f) Producing a calibrated confidence score and risk tier.
+
+  Claim 2 — CALIBRATION INNOVATION
+  The method of Claim 1, wherein the Random Forest classifier
+  applies isotonic regression post-training calibration
+  (CalibratedClassifierCV, method='isotonic') to correct
+  systematic overconfidence in tree-based probability estimates,
+  thereby reducing ensemble log-loss on out-of-sample data.
+
+  Claim 3 — EARLY STOPPING OPTIMIZATION
+  The method of Claim 1, wherein the Gradient Boosting
+  classifier employs an internal validation fraction for
+  early stopping (n_iter_no_change criterion), terminating
+  boosting iterations when validation log-loss fails to
+  improve, preventing overfitting while preserving
+  classification accuracy.
+
+  Claim 4 — EXPLAINABILITY LAYER
+  The method of Claim 1, further comprising:
+    (a) Identifying input tokens present in a curated
+        spam-signal lexicon;
+    (b) Ranking identified tokens by their Logistic
+        Regression coefficient scores (weighted by TF-IDF
+        feature value);
+    (c) Displaying the top-K (K≥3) ranked tokens as
+        human-interpretable spam signal indicators
+        alongside the classification verdict.
+
+  Claim 5 — RISK STRATIFICATION
+  The method of Claim 1, further comprising mapping the
+  ensemble spam probability to a five-tier risk level:
+    CRITICAL  (p ≥ 0.90)
+    HIGH      (0.70 ≤ p < 0.90)
+    MEDIUM    (0.50 ≤ p < 0.70)
+    LOW       (0.30 ≤ p < 0.50)
+    SAFE      (p < 0.30)
+  and presenting said risk tier in a user interface.
+
+  Claim 6 — DRIFT MONITORING
+  The method of Claim 1, further comprising maintaining a
+  sliding-window buffer of the N most recent classifications
+  (N = 100) to compute a real-time spam rate metric,
+  enabling detection of temporal shifts in spam patterns
+  without requiring full model retraining.
+
+  Claim 7 — WEB-BASED INTERFACE
+  A system implementing the method of Claim 1 via a web
+  application providing:
+    (a) A text input interface for email submission;
+    (b) An animated confidence arc visualization;
+    (c) Per-model probability bars for transparency;
+    (d) A donut chart displaying optimized ensemble weights;
+    (e) A session-scoped classification history log.
+
+----------------------------------------------------------------
+NOVELTY OVER PRIOR ART
+----------------------------------------------------------------
+
+Prior Art                 | Limitation | ALLWE Improvement
+--------------------------+------------+---------------------------
+SpamAssassin (NB-based)   | Single model, rule-based | 4-model ensemble
+Gmail (neural + heuristic)| Black-box, no probabilities shown | Transparent ALLWE
+Standard soft-voting      | Equal or accuracy-weighted | Log-loss optimized W
+Traditional stacking      | Meta-learner overfit risk | Direct scipy.minimize
+RF alone                  | Miscalibrated probs | Isotonic calibration
+GB alone                  | No early stopping on LL | n_iter_no_change on LL
+
+----------------------------------------------------------------
+BRIEF DESCRIPTION OF KEY ALGORITHMS
+----------------------------------------------------------------
+
+LOG-LOSS (Binary Cross-Entropy):
+  L = -(1/N) Σ [y_i log(p_i) + (1 - y_i) log(1 - p_i)]
+  
+  Properties:
+  - Proper scoring rule: uniquely minimized by true probabilities
+  - Penalizes confident wrong predictions exponentially
+  - Rewards calibrated probability estimates
+  - Lower is better (0 = perfect; ln(2) ≈ 0.693 = random)
+
+ENSEMBLE WEIGHT OPTIMIZATION:
+  Objective: min_{w} L(y, P·w)
+  Subject to: Σ w_i = 1, w_i ≥ 0
+  Method: SLSQP (Sequential Least Squares Programming)
+  via scipy.optimize.minimize
+
+ISOTONIC CALIBRATION (for Random Forest):
+  Maps uncalibrated RF probability estimates to calibrated
+  ones using isotonic regression (monotone function), fitted
+  on cross-validation folds. This corrects the characteristic
+  overconfidence of RF near p=0 and p=1.
+
+----------------------------------------------------------------
+CLAIMS SUMMARY
+----------------------------------------------------------------
+
+1. Core ALLWE architecture (4 models + log-loss weight opt.)
+2. Isotonic calibration applied to Random Forest in ensemble
+3. Gradient Boosting early stopping on log-loss
+4. LR-coefficient-based explainability layer
+5. Five-tier risk stratification from calibrated probability
+6. Sliding-window temporal drift monitor
+7. Web-based transparent UI with per-model breakdown
+
+----------------------------------------------------------------
+APPLICANT INFORMATION
+----------------------------------------------------------------
+
+Inventor(s): [Your Name(s)]
+Institution:  [Your University / Department]
+Filing Date:  [Date]
+Application:  Provisional Patent Application
+
+NOTE: This draft should be reviewed and filed through a
+registered patent attorney. File a Provisional Patent
+Application (PPA) first — it gives 12 months of "patent
+pending" status at lower cost.
+
+Indian Patent Office: https://ipindia.gov.in
+USPTO (US):           https://www.uspto.gov
+EPO (Europe):         https://www.epo.org
+
+================================================================

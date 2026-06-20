@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpamGuard — Bulk Email Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #080c14;
+  --surface:  #0d1424;
+  --panel:    #111827;
+  --border:   #1e2d45;
+  --accent:   #00d4ff;
+  --green:    #00ff9d;
+  --red:      #ff3b5c;
+  --orange:   #ff9500;
+  --yellow:   #ffd60a;
+  --muted:    #3a4d6b;
+  --text:     #c8d8f0;
+  --dim:      #546a89;
+  --mono:     'Space Mono', monospace;
+  --sans:     'DM Sans', sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body {
+  background:var(--bg); color:var(--text);
+  font-family:var(--sans); min-height:100vh;
+}
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:
+    linear-gradient(rgba(0,212,255,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,.04) 1px, transparent 1px);
+  background-size:40px 40px;
+}
+body::after {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:1;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.07) 2px,rgba(0,0,0,.07) 4px);
+}
+.app { position:relative; z-index:2; max-width:1300px; margin:0 auto; padding:0 24px 60px; }
+
+/* ── Header ── */
+header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:28px 0 20px; border-bottom:1px solid var(--border); margin-bottom:32px;
+}
+.logo { display:flex; align-items:center; gap:14px; }
+.logo-icon {
+  width:44px; height:44px;
+  background:linear-gradient(135deg,var(--accent),#0066ff);
+  border-radius:10px; display:flex; align-items:center; justify-content:center;
+  font-size:22px; box-shadow:0 0 20px rgba(0,212,255,.3);
+  animation:pulse-logo 3s ease-in-out infinite;
+}
+@keyframes pulse-logo {0%,100%{box-shadow:0 0 20px rgba(0,212,255,.3);}50%{box-shadow:0 0 40px rgba(0,212,255,.6);}}
+.logo-text h1 { font-family:var(--mono); font-size:20px; color:#fff; }
+.logo-text p  { font-size:11px; color:var(--dim); letter-spacing:1.5px; text-transform:uppercase; margin-top:2px; }
+.header-links { display:flex; gap:12px; align-items:center; }
+.hbadge {
+  display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:11px;
+  padding:7px 14px; border-radius:20px; text-decoration:none; transition:all .2s; cursor:pointer;
+}
+.hbadge.active { color:var(--green); background:rgba(0,255,157,.08); border:1px solid rgba(0,255,157,.25); }
+.hbadge.inactive { color:var(--dim); background:rgba(255,255,255,.04); border:1px solid var(--border); }
+.hbadge.inactive:hover { border-color:var(--muted); color:var(--text); }
+.blink { width:7px; height:7px; border-radius:50%; background:var(--green); animation:blink 1.5s ease-in-out infinite; }
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+
+/* ── Input section ── */
+.input-section {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; overflow:hidden; margin-bottom:24px;
+}
+.panel-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 22px; border-bottom:1px solid var(--border);
+}
+.ph-left { display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:12px; letter-spacing:1px; text-transform:uppercase; color:var(--dim); }
+.dot { width:8px; height:8px; border-radius:50%; background:var(--accent); }
+.ph-hint { font-size:12px; color:var(--dim); }
+
+.format-info {
+  margin:18px 22px 0;
+  background:rgba(0,212,255,.06); border:1px solid rgba(0,212,255,.15);
+  border-radius:10px; padding:14px 18px;
+  display:flex; align-items:flex-start; gap:14px;
+}
+.fi-icon { font-size:18px; flex-shrink:0; margin-top:1px; }
+.fi-text h4 { font-family:var(--mono); font-size:12px; color:var(--accent); margin-bottom:6px; }
+.fi-text p  { font-size:12.5px; color:var(--dim); line-height:1.7; }
+.fi-text code { font-family:var(--mono); font-size:11px; background:rgba(0,212,255,.1); padding:2px 7px; border-radius:4px; color:var(--accent); }
+
+textarea {
+  width:100%; background:var(--panel); border:none; border-top:1px solid var(--border);
+  color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.8;
+  padding:20px 22px; resize:vertical; min-height:220px; outline:none;
+  margin-top:18px; display:block;
+}
+textarea::placeholder { color:var(--muted); }
+textarea:focus { border-top-color:var(--accent); box-shadow:inset 0 2px 0 rgba(0,212,255,.15); }
+
+.input-footer {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 22px; border-top:1px solid var(--border);
+}
+.email-counter { font-family:var(--mono); font-size:12px; color:var(--dim); }
+.email-counter span { color:var(--accent); }
+
+.sample-btn {
+  font-size:12px; color:var(--dim); background:transparent;
+  border:1px solid var(--border); border-radius:20px; padding:6px 14px;
+  cursor:pointer; font-family:var(--sans); transition:all .2s;
+}
+.sample-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+.analyze-btn {
+  padding:14px 40px; background:linear-gradient(135deg,var(--accent),#0077ee);
+  border:none; border-radius:10px; color:#000; font-family:var(--mono);
+  font-size:13px; font-weight:700; letter-spacing:2px; cursor:pointer;
+  text-transform:uppercase; transition:all .2s;
+  box-shadow:0 4px 20px rgba(0,212,255,.25);
+}
+.analyze-btn:hover { box-shadow:0 6px 30px rgba(0,212,255,.4); }
+.analyze-btn:disabled { opacity:.4; cursor:not-allowed; }
+
+/* ── Progress ── */
+.progress-wrap {
+  display:none; background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; padding:28px 28px; margin-bottom:24px; text-align:center;
+}
+.progress-wrap.show { display:block; }
+.progress-title { font-family:var(--mono); font-size:14px; color:var(--accent); margin-bottom:16px; }
+.progress-bar-bg {
+  height:8px; background:var(--panel); border-radius:4px; overflow:hidden; margin-bottom:12px;
+}
+.progress-bar-fill {
+  height:100%; background:linear-gradient(90deg,var(--accent),#0066ff);
+  border-radius:4px; transition:width .3s ease; width:0%;
+  box-shadow:0 0 10px rgba(0,212,255,.4);
+}
+.progress-label { font-size:12px; color:var(--dim); font-family:var(--mono); }
+
+/* ── Summary bar ── */
+.summary-bar {
+  display:none; grid-template-columns:repeat(7,1fr); gap:12px; margin-bottom:24px;
+}
+.summary-bar.show { display:grid; }
+.sc {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; padding:14px 16px; text-align:center;
+  position:relative; overflow:hidden;
+}
+.sc::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.sc.total::before  { background:linear-gradient(90deg,var(--accent),transparent); }
+.sc.spam::before   { background:linear-gradient(90deg,var(--red),transparent); }
+.sc.ham::before    { background:linear-gradient(90deg,var(--green),transparent); }
+.sc.crit::before   { background:var(--red); }
+.sc.high::before   { background:var(--orange); }
+.sc.medium::before { background:var(--yellow); }
+.sc.safe::before   { background:var(--green); }
+.sc-val { font-family:var(--mono); font-size:26px; font-weight:700; color:#fff; }
+.sc-label { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--dim); margin-top:4px; }
+
+/* ── Results section ── */
+.results-section { display:none; }
+.results-section.show { display:block; }
+
+/* ── Filter tabs ── */
+.filter-tabs {
+  display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; align-items:center;
+}
+.filter-tab {
+  font-family:var(--mono); font-size:11px; padding:7px 16px;
+  border-radius:20px; cursor:pointer; border:1px solid var(--border);
+  color:var(--dim); background:transparent; transition:all .2s; letter-spacing:.5px;
+}
+.filter-tab:hover { border-color:var(--muted); color:var(--text); }
+.filter-tab.active { border-color:var(--accent); color:var(--accent); background:rgba(0,212,255,.08); }
+.filter-tab.risk-CRITICAL.active { border-color:var(--red);    color:var(--red);    background:rgba(255,59,92,.08); }
+.filter-tab.risk-HIGH.active     { border-color:var(--orange); color:var(--orange); background:rgba(255,149,0,.08); }
+.filter-tab.risk-MEDIUM.active   { border-color:var(--yellow); color:var(--yellow); background:rgba(255,214,10,.08); }
+.filter-tab.risk-SAFE.active,
+.filter-tab.risk-HAM.active      { border-color:var(--green);  color:var(--green);  background:rgba(0,255,157,.08); }
+
+.sort-controls { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.sort-label { font-size:12px; color:var(--dim); }
+.sort-select {
+  background:var(--panel); border:1px solid var(--border); color:var(--text);
+  font-family:var(--mono); font-size:11px; padding:6px 12px; border-radius:8px;
+  outline:none; cursor:pointer;
+}
+
+/* ── Email cards ── */
+.cards-grid { display:flex; flex-direction:column; gap:10px; }
+
+.email-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; overflow:hidden; transition:border-color .2s;
+  cursor:pointer;
+}
+.email-card:hover { border-color:var(--muted); }
+.email-card.expanded { border-color:var(--accent); }
+
+.card-top {
+  display:flex; align-items:center; gap:14px; padding:14px 18px;
+}
+
+.card-num {
+  font-family:var(--mono); font-size:11px; color:var(--dim);
+  width:28px; flex-shrink:0; text-align:right;
+}
+
+.risk-dot {
+  width:10px; height:10px; border-radius:50%; flex-shrink:0;
+}
+.rd-CRITICAL { background:var(--red);    box-shadow:0 0 8px var(--red); }
+.rd-HIGH     { background:var(--orange); box-shadow:0 0 8px var(--orange); }
+.rd-MEDIUM   { background:var(--yellow); box-shadow:0 0 6px var(--yellow); }
+.rd-LOW      { background:var(--accent); }
+.rd-SAFE     { background:var(--green);  box-shadow:0 0 6px var(--green); }
+
+.card-preview {
+  flex:1; font-size:13.5px; color:var(--text);
+  overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+}
+
+.card-right {
+  display:flex; align-items:center; gap:12px; flex-shrink:0;
+}
+
+.risk-pill {
+  font-family:var(--mono); font-size:10px; font-weight:700;
+  padding:4px 10px; border-radius:20px; letter-spacing:1px; text-transform:uppercase;
+}
+.rp-CRITICAL { background:rgba(255,59,92,.15);  color:var(--red);    border:1px solid rgba(255,59,92,.35); }
+.rp-HIGH     { background:rgba(255,149,0,.15);  color:var(--orange); border:1px solid rgba(255,149,0,.35); }
+.rp-MEDIUM   { background:rgba(255,214,10,.12); color:var(--yellow); border:1px solid rgba(255,214,10,.3); }
+.rp-LOW      { background:rgba(0,212,255,.1);   color:var(--accent); border:1px solid rgba(0,212,255,.3); }
+.rp-SAFE     { background:rgba(0,255,157,.1);   color:var(--green);  border:1px solid rgba(0,255,157,.3); }
+
+.conf-badge {
+  font-family:var(--mono); font-size:12px; color:var(--dim); width:52px; text-align:right;
+}
+
+.expand-arrow {
+  font-size:11px; color:var(--dim); transition:transform .2s; flex-shrink:0;
+}
+.email-card.expanded .expand-arrow { transform:rotate(180deg); }
+
+/* ── Expanded detail ── */
+.card-detail {
+  display:none; border-top:1px solid var(--border);
+  padding:18px 20px; background:var(--panel);
+}
+.email-card.expanded .card-detail { display:block; }
+
+.cd-full-text {
+  font-size:13px; color:var(--text); line-height:1.8;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; padding:14px 16px; margin-bottom:16px;
+  white-space:pre-wrap; word-break:break-word; max-height:160px; overflow-y:auto;
+}
+
+.cd-models { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:12px; }
+.cd-model-row { }
+.cd-mr-top { display:flex; justify-content:space-between; margin-bottom:4px; }
+.cd-mr-name { font-size:12px; color:var(--dim); }
+.cd-mr-val  { font-family:var(--mono); font-size:11px; color:var(--accent); }
+.cd-bar-bg  { height:5px; background:rgba(255,255,255,.06); border-radius:3px; overflow:hidden; }
+.cd-bar-fill { height:100%; border-radius:3px; transition:width .8s cubic-bezier(.25,.46,.45,.94); }
+.cd-bar-spam { background:linear-gradient(90deg,var(--orange),var(--red)); }
+.cd-bar-ham  { background:linear-gradient(90deg,var(--accent),var(--green)); }
+
+.cd-words { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+.cd-word {
+  font-family:var(--mono); font-size:10px; padding:3px 10px;
+  background:rgba(255,59,92,.1); border:1px solid rgba(255,59,92,.25);
+  border-radius:20px; color:var(--red);
+}
+
+.no-results { text-align:center; padding:40px; color:var(--dim); font-size:14px; }
+
+/* ── Export bar ── */
+.export-bar {
+  display:none; align-items:center; justify-content:space-between;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; padding:14px 22px; margin-bottom:20px;
+}
+.export-bar.show { display:flex; }
+.export-title { font-family:var(--mono); font-size:12px; color:var(--text); }
+.export-btns { display:flex; gap:10px; }
+.exp-btn {
+  font-size:12px; padding:7px 16px; border-radius:8px;
+  border:1px solid var(--border); background:transparent;
+  color:var(--dim); cursor:pointer; font-family:var(--sans);
+  transition:all .2s;
+}
+.exp-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+@media(max-width:900px){
+  .summary-bar { grid-template-columns:repeat(3,1fr); }
+  .cd-models   { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🛡</div>
+      <div class="logo-text">
+        <h1>SpamGuard</h1>
+        <p>ALLWE Detection Engine v1.0</p>
+      </div>
+    </div>
+    <div class="header-links">
+      <a href="/" class="hbadge inactive">◀ Single Analyzer</a>
+      <div class="hbadge active"><div class="blink"></div>BULK ANALYZER</div>
+    </div>
+  </header>
+
+  <!-- INPUT -->
+  <div class="input-section">
+    <div class="panel-header">
+      <div class="ph-left"><div class="dot"></div>Paste Multiple Emails</div>
+      <span class="ph-hint">Ctrl+Enter to analyze</span>
+    </div>
+
+    <div class="format-info">
+      <div class="fi-icon">📋</div>
+      <div class="fi-text">
+        <h4>How to Separate Emails</h4>
+        <p>
+          Paste all your emails and separate them with: <code>---</code> on its own line.<br>
+          Or use: <code>===</code> &nbsp;|&nbsp; <code>###</code> &nbsp;|&nbsp; <code>EMAIL 1 / EMAIL 2</code> &nbsp;|&nbsp; blank lines also work as separators.
+        </p>
+      </div>
+    </div>
+
+    <textarea id="bulk-input" placeholder="Paste Email 1 here...
+---
+Paste Email 2 here...
+---
+Paste Email 3 here...
+
+You can paste as many emails as you want. Separate them with --- or === or leave a blank line between them."></textarea>
+
+    <div class="input-footer">
+      <div class="email-counter">Detected: <span id="email-count">0</span> email(s)</div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button class="sample-btn" onclick="loadSamples()">⚡ Load 20 Sample Emails</button>
+        <button class="analyze-btn" id="analyze-btn" onclick="runBulk()">▶ ANALYZE ALL</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap" id="progress-wrap">
+    <div class="progress-title" id="progress-title">INITIALIZING ALLWE ENSEMBLE...</div>
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-bar"></div></div>
+    <div class="progress-label" id="progress-label">0 / 0 emails processed</div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="summary-bar" id="summary-bar">
+    <div class="sc total">
+      <div class="sc-val" id="s-total">0</div>
+      <div class="sc-label">Total</div>
+    </div>
+    <div class="sc spam">
+      <div class="sc-val" id="s-spam" style="color:var(--red)">0</div>
+      <div class="sc-label">Spam</div>
+    </div>
+    <div class="sc ham">
+      <div class="sc-val" id="s-ham" style="color:var(--green)">0</div>
+      <div class="sc-label">Safe</div>
+    </div>
+    <div class="sc crit">
+      <div class="sc-val" id="s-crit" style="color:var(--red)">0</div>
+      <div class="sc-label">Critical</div>
+    </div>
+    <div class="sc high">
+      <div class="sc-val" id="s-high" style="color:var(--orange)">0</div>
+      <div class="sc-label">High</div>
+    </div>
+    <div class="sc medium">
+      <div class="sc-val" id="s-med" style="color:var(--yellow)">0</div>
+      <div class="sc-label">Medium</div>
+    </div>
+    <div class="sc safe">
+      <div class="sc-val" id="s-safe" style="color:var(--green)">0</div>
+      <div class="sc-label">Safe</div>
+    </div>
+  </div>
+
+  <!-- EXPORT BAR -->
+  <div class="export-bar" id="export-bar">
+    <div class="export-title" id="export-title"></div>
+    <div class="export-btns">
+      <button class="exp-btn" onclick="exportCSV()">⬇ Export CSV</button>
+      <button class="exp-btn" onclick="exportTXT()">⬇ Export TXT Report</button>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results-section" id="results-section">
+
+    <div class="filter-tabs" id="filter-tabs"></div>
+
+    <div class="cards-grid" id="cards-grid"></div>
+
+  </div>
+
+</div>
+
+<script>
+// ── Separator detection ───────────────────────────────────────
+function splitEmails(raw) {
+  // Try explicit separators first
+  const sepPattern = /\n\s*(?:---|===|###)\s*\n/g;
+  let parts;
+  if (sepPattern.test(raw)) {
+    parts = raw.split(/\n\s*(?:---|===|###)\s*\n/);
+  } else {
+    // Fall back: split on double blank lines
+    parts = raw.split(/\n\s*\n\s*\n/);
+  }
+  return parts.map(p => p.trim()).filter(p => p.length > 10);
+}
+
+// ── Live email count ──────────────────────────────────────────
+document.getElementById('bulk-input').addEventListener('input', function() {
+  const emails = splitEmails(this.value);
+  document.getElementById('email-count').textContent = emails.length;
+});
+
+document.getElementById('bulk-input').addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') runBulk();
+});
+
+// ── Sample data ───────────────────────────────────────────────
+const SAMPLES = [
+  "CONGRATULATIONS!! You have been selected as our LUCKY WINNER of £1,000,000 in the International Lottery Draw. To claim your prize CALL NOW: 09061234567. Claim code: WIN2024. Offer expires in 24 HOURS!!",
+  "Hi Rahul, just wanted to confirm our meeting scheduled for Thursday at 3pm in Conference Room 2. The agenda includes Q3 performance review and budget planning for next quarter. Please bring your department reports.",
+  "URGENT NOTICE: Your bank account has been temporarily suspended due to unusual activity. Verify your identity immediately at http://secure-banking-update.xyz or your account will be permanently closed within 48 hours. Click NOW.",
+  "Hey, did you finish the Machine Learning assignment? I'm stuck on question 4 about gradient descent. Can we meet in the library tomorrow afternoon and work through it together? Submission deadline is Friday.",
+  "You have WON a FREE iPhone 15 Pro! You were randomly selected from 1 million users. Click here to claim your FREE gift before it expires! Limited offer - only 3 left! Act NOW!!!",
+  "Beta, dinner is ready at 8 tonight. Papa is coming home early so please be on time. Also can you pick up some milk and bread from the shop on your way back? Love, Mom",
+  "AMAZING weight loss secret doctors don't want you to know! Lose 30 pounds in 30 days GUARANTEED! No diet, no exercise needed. Buy now and get 50% OFF. Click to order cheap pills today!!!",
+  "Your order #ORD-2847561 has been confirmed and is being processed. Your Samsung Galaxy earbuds will be delivered within 3-5 business days. Track your order using the order number on our website.",
+  "Dear Customer, you have been selected for a work from home opportunity. Earn $5000 per week! No experience needed. FREE registration today only. Call 1-800-EARN-NOW to claim your exclusive offer NOW!",
+  "Dear Students, the mid-semester examination schedule has been uploaded to the student portal. Please check your exam timetable and hall ticket. Students with backlogs must register separately by December 10th.",
+  "INVESTMENT ALERT: Bitcoin millionaire reveals secret formula. Turn $250 into $50,000 in just 7 days GUARANTEED! Exclusive limited access. Register now free. Warning: only 10 spots remaining!!!",
+  "Hey! Are you coming to Ankit's birthday party on Saturday? It's at his place around 7pm. He said to bring nothing just yourself. Should be fun, most of the group is coming. Let me know!",
+  "Buy cheap V1agra, Cialis online! No prescription needed. Lowest prices guaranteed. Discreet shipping worldwide. Save 80% today. Order now and get FREE bonus pills. 100% satisfaction guaranteed.",
+  "Dear Abhay, thank you for applying for the Software Engineering Intern position. We have reviewed your application and would like to invite you for a technical interview. Please reply with your availability for next week.",
+  "Your account has been compromised. Verify your PayPal details immediately at http://paypal-secure-verify.net or your account will be permanently suspended within 12 hours.",
+  "Please find attached the revised project proposal. I've updated the timeline based on our discussion yesterday and addressed the feedback from the client. Can you review before Friday?",
+  "You have been awarded a $500 Walmart Gift Card! To redeem your FREE $500 card call 555-GIFT-NOW or text CLAIM to 88990. Hurry - expires midnight tonight!",
+  "The lecture notes for Unit 4 have been uploaded to the course portal. Please review the material on Support Vector Machines before Friday's class as we will have a short quiz.",
+  "Your Swiggy order from Domino's is on the way! Your delivery partner Ramesh is 5 minutes away. Order: 1x Farmhouse Pizza, 1x Garlic Bread. Estimated arrival: 8:32 PM.",
+  "Hey the electricity bill came today - it's 1840 rupees for this month. So your share is 920. Can you transfer it by this weekend? Also the WiFi bill is due next week, same split as last time."
+];
+
+function loadSamples() {
+  document.getElementById('bulk-input').value = SAMPLES.join('\n---\n');
+  document.getElementById('email-count').textContent = SAMPLES.length;
+}
+
+// ── Run Bulk ──────────────────────────────────────────────────
+let allResults = [];
+let currentFilter = 'ALL';
+
+async function runBulk() {
+  const raw    = document.getElementById('bulk-input').value.trim();
+  const emails = splitEmails(raw);
+  if (emails.length === 0) { alert('Please paste some emails first.'); return; }
+
+  const btn = document.getElementById('analyze-btn');
+  btn.disabled = true;
+
+  // Show progress
+  document.getElementById('progress-wrap').classList.add('show');
+  document.getElementById('summary-bar').classList.remove('show');
+  document.getElementById('results-section').classList.remove('show');
+  document.getElementById('export-bar').classList.remove('show');
+
+  setProgress(0, emails.length);
+
+  try {
+    const res  = await fetch('/bulk_analyze', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ emails })
+    });
+    const data = await res.json();
+
+    setProgress(emails.length, emails.length);
+    await sleep(400);
+
+    document.getElementById('progress-wrap').classList.remove('show');
+
+    allResults = data.all;
+    renderSummary(data.summary);
+    renderFilters(data.summary, data.groups);
+    renderCards(allResults);
+
+    document.getElementById('summary-bar').classList.add('show');
+    document.getElementById('results-section').classList.add('show');
+    document.getElementById('export-bar').classList.add('show');
+    document.getElementById('export-title').textContent =
+      `${data.summary.total} emails analyzed — ${data.summary.spam} spam, ${data.summary.ham} safe`;
+
+  } catch(e) {
+    alert('Error: Is app.py running?');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function setProgress(done, total) {
+  const pct = total > 0 ? (done / total * 100) : 0;
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = `${done} / ${total} emails processed`;
+  document.getElementById('progress-title').textContent =
+    done === total ? '✓ ANALYSIS COMPLETE' : `ANALYZING EMAIL ${done + 1} OF ${total}...`;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── Summary ───────────────────────────────────────────────────
+function renderSummary(s) {
+  document.getElementById('s-total').textContent = s.total;
+  document.getElementById('s-spam').textContent  = s.spam;
+  document.getElementById('s-ham').textContent   = s.ham;
+  document.getElementById('s-crit').textContent  = s.critical;
+  document.getElementById('s-high').textContent  = s.high;
+  document.getElementById('s-med').textContent   = s.medium;
+  document.getElementById('s-safe').textContent  = s.safe;
+}
+
+// ── Filter tabs ───────────────────────────────────────────────
+function renderFilters(summary, groups) {
+  const tabs = [
+    { key:'ALL',      label:`All (${summary.total})`,          cls:'' },
+    { key:'CRITICAL', label:`🔴 Critical (${summary.critical})`, cls:'risk-CRITICAL' },
+    { key:'HIGH',     label:`🟠 High (${summary.high})`,          cls:'risk-HIGH' },
+    { key:'MEDIUM',   label:`🟡 Medium (${summary.medium})`,      cls:'risk-MEDIUM' },
+    { key:'LOW',      label:`🔵 Low Risk (${summary.low || 0})`,   cls:'risk-LOW' },
+    { key:'SAFE',     label:`🟢 Safe (${summary.safe})`,           cls:'risk-SAFE' },
+    { key:'SPAM',     label:`⚠ Spam Only (${summary.spam})`,      cls:'risk-CRITICAL' },
+    { key:'HAM',      label:`✓ Ham Only (${summary.ham})`,         cls:'risk-HAM' },
+  ];
+
+  const container = document.getElementById('filter-tabs');
+  container.innerHTML = '';
+
+  tabs.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = `filter-tab ${t.cls} ${t.key === 'ALL' ? 'active' : ''}`;
+    btn.textContent = t.label;
+    btn.dataset.key = t.key;
+    btn.onclick = () => setFilter(t.key);
+    container.appendChild(btn);
+  });
+
+  // Sort control
+  const sortWrap = document.createElement('div');
+  sortWrap.className = 'sort-controls';
+  sortWrap.innerHTML = `
+    <span class="sort-label">Sort by:</span>
+    <select class="sort-select" id="sort-select" onchange="applySort()">
+      <option value="risk">Risk Level</option>
+      <option value="conf_desc">Confidence ↓</option>
+      <option value="conf_asc">Confidence ↑</option>
+      <option value="original">Original Order</option>
+    </select>`;
+  container.appendChild(sortWrap);
+}
+
+function setFilter(key) {
+  currentFilter = key;
+  document.querySelectorAll('.filter-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.key === key);
+  });
+  applySort();
+}
+
+function applySort() {
+  const sort   = document.getElementById('sort-select')?.value || 'risk';
+  const riskOrder = { CRITICAL:0, HIGH:1, MEDIUM:2, LOW:3, SAFE:4 };
+
+  let filtered = allResults.filter(r => {
+    if (currentFilter === 'ALL')  return true;
+    if (currentFilter === 'SPAM') return r.label === 'SPAM';
+    if (currentFilter === 'HAM')  return r.label === 'HAM';
+    return r.risk === currentFilter;
+  });
+
+  if (sort === 'risk')      filtered.sort((a,b) => riskOrder[a.risk] - riskOrder[b.risk]);
+  if (sort === 'conf_desc') filtered.sort((a,b) => b.ensemble_prob - a.ensemble_prob);
+  if (sort === 'conf_asc')  filtered.sort((a,b) => a.ensemble_prob - b.ensemble_prob);
+  if (sort === 'original')  filtered.sort((a,b) => a.id - b.id);
+
+  renderCards(filtered);
+}
+
+// ── Cards ─────────────────────────────────────────────────────
+function renderCards(items) {
+  const grid = document.getElementById('cards-grid');
+  if (items.length === 0) {
+    grid.innerHTML = '<div class="no-results">No emails match this filter.</div>';
+    return;
+  }
+
+  grid.innerHTML = items.map((r, idx) => {
+    const isSpam  = r.label === 'SPAM';
+    const barCls  = isSpam ? 'cd-bar-spam' : 'cd-bar-ham';
+    const modelBars = Object.entries(r.model_scores).map(([name, score]) => `
+      <div class="cd-model-row">
+        <div class="cd-mr-top">
+          <span class="cd-mr-name">${name}</span>
+          <span class="cd-mr-val">${score.toFixed(1)}%</span>
+        </div>
+        <div class="cd-bar-bg">
+          <div class="cd-bar-fill ${barCls}" style="width:${score}%"></div>
+        </div>
+      </div>`).join('');
+
+    const wordChips = r.top_spam_words && r.top_spam_words.length > 0
+      ? `<div style="margin-top:10px;">
+           <div style="font-size:11px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Spam Signals</div>
+           <div class="cd-words">${r.top_spam_words.map(w => `<span class="cd-word">${w}</span>`).join('')}</div>
+         </div>` : '';
+
+    return `
+    <div class="email-card" id="card-${idx}" onclick="toggleCard(${idx})">
+      <div class="card-top">
+        <div class="card-num">#${r.id}</div>
+        <div class="risk-dot rd-${r.risk}"></div>
+        <div class="card-preview">${escHtml(r.preview)}</div>
+        <div class="card-right">
+          <span class="risk-pill rp-${r.risk}">${r.risk}</span>
+          <span class="conf-badge">${r.confidence.toFixed(0)}%</span>
+          <span class="expand-arrow">▼</span>
+        </div>
+      </div>
+      <div class="card-detail">
+        <div class="cd-full-text">${escHtml(r.full_text)}</div>
+        <div class="cd-models">${modelBars}</div>
+        ${wordChips}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleCard(idx) {
+  document.getElementById(`card-${idx}`).classList.toggle('expanded');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Export CSV ────────────────────────────────────────────────
+function exportCSV() {
+  const rows = [['#','Label','Risk','Confidence%','Spam_Prob%','NB%','LR%','RF%','GB%','Preview']];
+  allResults.forEach(r => {
+    const ms = r.model_scores;
+    rows.push([
+      r.id, r.label, r.risk,
+      r.confidence.toFixed(2), r.ensemble_prob.toFixed(2),
+      ms['Naive Bayes'].toFixed(2), ms['Logistic Regression'].toFixed(2),
+      ms['Random Forest'].toFixed(2), ms['Gradient Boosting'].toFixed(2),
+      '"' + r.preview.replace(/"/g,"'") + '"'
+    ]);
+  });
+  const csv = rows.map(r => r.join(',')).join('\n');
+  download('SpamGuard_Results.csv', csv, 'text/csv');
+}
+
+// ── Export TXT ────────────────────────────────────────────────
+function exportTXT() {
+  const lines = [
+    'SPAMGUARD — BULK ANALYSIS REPORT',
+    '=' .repeat(60),
+    `Total Analyzed: ${allResults.length}`,
+    `Spam: ${allResults.filter(r=>r.label==='SPAM').length}`,
+    `Safe: ${allResults.filter(r=>r.label==='HAM').length}`,
+    '='.repeat(60), ''
+  ];
+  allResults.forEach(r => {
+    lines.push(`[${r.id}] ${r.label} | ${r.risk} | ${r.confidence.toFixed(1)}% confidence`);
+    lines.push(r.full_text.slice(0,120) + (r.full_text.length>120?'...':''));
+    lines.push('');
+  });
+  download('SpamGuard_Report.txt', lines.join('\n'), 'text/plain');
+}
+
+function download(filename, content, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type:mime}));
+  a.download = filename;
+  a.click();
+}
+</script>
+</body>
+</html>

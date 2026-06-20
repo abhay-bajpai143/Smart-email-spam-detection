@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpamGuard — Adaptive Spam Detection System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #080c14;
+  --surface:  #0d1424;
+  --panel:    #111827;
+  --border:   #1e2d45;
+  --accent:   #00d4ff;
+  --green:    #00ff9d;
+  --red:      #ff3b5c;
+  --orange:   #ff9500;
+  --yellow:   #ffd60a;
+  --muted:    #3a4d6b;
+  --text:     #c8d8f0;
+  --text-dim: #546a89;
+  --mono:     'Space Mono', monospace;
+  --sans:     'DM Sans', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Animated grid background ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Scanline effect */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,.08) 2px,
+    rgba(0,0,0,.08) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.app { position: relative; z-index: 2; max-width: 1280px; margin: 0 auto; padding: 0 24px 60px; }
+
+/* ── Header ── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28px 0 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 32px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.logo-icon {
+  width: 44px; height: 44px;
+  background: linear-gradient(135deg, var(--accent), #0066ff);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  box-shadow: 0 0 20px rgba(0,212,255,.3);
+  animation: pulse-logo 3s ease-in-out infinite;
+}
+
+@keyframes pulse-logo {
+  0%,100% { box-shadow: 0 0 20px rgba(0,212,255,.3); }
+  50%      { box-shadow: 0 0 40px rgba(0,212,255,.6); }
+}
+
+.logo-text h1 {
+  font-family: var(--mono);
+  font-size: 20px;
+  color: #fff;
+  letter-spacing: .5px;
+}
+.logo-text p {
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.header-badge {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  background: rgba(0,212,255,.08);
+  border: 1px solid rgba(0,212,255,.2);
+  padding: 7px 14px;
+  border-radius: 20px;
+}
+.header-badge::before {
+  content: '';
+  width: 7px; height: 7px;
+  background: var(--green);
+  border-radius: 50%;
+  animation: blink 1.5s ease-in-out infinite;
+}
+@keyframes blink { 0%,100% { opacity:1 } 50% { opacity:.2 } }
+
+/* ── Stat bar ── */
+.stat-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.stat-card:hover { border-color: var(--muted); }
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+}
+
+.stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+.stat-value {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+}
+.stat-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* ── Main grid ── */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 20px;
+}
+
+/* ── Panel ── */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.panel-header .dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.panel-body { padding: 22px; }
+
+/* ── Input area ── */
+.input-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+textarea {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14.5px;
+  line-height: 1.7;
+  padding: 16px 18px;
+  resize: vertical;
+  min-height: 160px;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+textarea::placeholder { color: var(--muted); }
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0,212,255,.1);
+}
+
+/* ── Quick test chips ── */
+.quick-tests { margin: 12px 0; }
+.quick-label { font-size: 11px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  font-size: 11.5px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  background: transparent;
+  transition: all .2s;
+  font-family: var(--sans);
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,.06); }
+.chip.spam-chip:hover { border-color: var(--red); color: var(--red); background: rgba(255,59,92,.06); }
+
+/* ── Analyze button ── */
+.analyze-btn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 15px;
+  background: linear-gradient(135deg, var(--accent), #0077ee);
+  border: none;
+  border-radius: 10px;
+  color: #000;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: opacity .2s, transform .1s, box-shadow .2s;
+  box-shadow: 0 4px 20px rgba(0,212,255,.25);
+}
+.analyze-btn:hover { opacity: .92; box-shadow: 0 6px 30px rgba(0,212,255,.4); }
+.analyze-btn:active { transform: scale(.99); }
+.analyze-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ── Result panel ── */
+.result-area {
+  margin-top: 22px;
+  display: none;
+}
+.result-area.visible { display: block; animation: slide-in .35s ease; }
+@keyframes slide-in {
+  from { opacity:0; transform: translateY(12px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+
+/* ── Verdict banner ── */
+.verdict {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  border-radius: 12px;
+  margin-bottom: 18px;
+  border: 1px solid;
+}
+.verdict.spam {
+  background: rgba(255,59,92,.08);
+  border-color: rgba(255,59,92,.3);
+}
+.verdict.ham {
+  background: rgba(0,255,157,.06);
+  border-color: rgba(0,255,157,.25);
+}
+
+.verdict-icon { font-size: 32px; }
+.verdict-text h2 {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 700;
+}
+.verdict.spam .verdict-text h2 { color: var(--red); }
+.verdict.ham  .verdict-text h2 { color: var(--green); }
+.verdict-text p { font-size: 13px; color: var(--text-dim); margin-top: 3px; }
+
+.risk-badge {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 20px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.risk-CRITICAL { background: rgba(255,59,92,.2); color: var(--red); border: 1px solid rgba(255,59,92,.4); }
+.risk-HIGH     { background: rgba(255,149,0,.2);  color: var(--orange); border: 1px solid rgba(255,149,0,.4); }
+.risk-MEDIUM   { background: rgba(255,214,10,.15); color: var(--yellow); border: 1px solid rgba(255,214,10,.3); }
+.risk-LOW      { background: rgba(0,212,255,.1);  color: var(--accent); border: 1px solid rgba(0,212,255,.3); }
+.risk-SAFE     { background: rgba(0,255,157,.1);  color: var(--green);  border: 1px solid rgba(0,255,157,.3); }
+
+/* ── Confidence arc ── */
+.conf-arc-wrap {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 18px;
+}
+.arc-canvas { flex-shrink: 0; }
+.conf-details h3 {
+  font-family: var(--mono);
+  font-size: 26px;
+  color: #fff;
+}
+.conf-details p {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.latency {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: right;
+}
+
+/* ── Model breakdown ── */
+.model-breakdown { margin-bottom: 18px; }
+.mb-title {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+.mb-row { margin-bottom: 10px; }
+.mb-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+.mb-name { font-size: 13px; color: var(--text); }
+.mb-score { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+.mb-bar-bg {
+  height: 6px;
+  background: var(--panel);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.mb-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .8s cubic-bezier(.25,.46,.45,.94);
+  background: linear-gradient(90deg, var(--accent), #0066ff);
+}
+.mb-bar-fill.spam-bar { background: linear-gradient(90deg, var(--orange), var(--red)); }
+
+/* ── Spam words ── */
+.spam-words { margin-bottom: 18px; }
+.sw-title {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+.sw-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.sw-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 5px 12px;
+  background: rgba(255,59,92,.1);
+  border: 1px solid rgba(255,59,92,.3);
+  border-radius: 20px;
+  color: var(--red);
+  letter-spacing: .5px;
+}
+
+/* ── Right column ── */
+.right-col { display: flex; flex-direction: column; gap: 20px; }
+
+/* ── History ── */
+.history-list { display: flex; flex-direction: column; gap: 8px; }
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  transition: border-color .15s;
+}
+.history-item:hover { border-color: var(--muted); }
+.hi-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.hi-dot.spam { background: var(--red); box-shadow: 0 0 6px var(--red); }
+.hi-dot.ham  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.hi-text {
+  font-size: 12.5px;
+  color: var(--text);
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hi-conf {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+/* ── Ensemble weights donut chart ── */
+.weights-section { }
+.weights-canvas-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 8px 0;
+}
+.weights-legend { font-size: 12px; }
+.wl-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.wl-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.wl-name { color: var(--text-dim); }
+.wl-val  { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--text); }
+
+/* ── Patent badge ── */
+.patent-notice {
+  background: linear-gradient(135deg, rgba(0,212,255,.06), rgba(0,102,255,.06));
+  border: 1px solid rgba(0,212,255,.15);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.patent-notice .icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+.patent-notice h4 {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: .5px;
+  margin-bottom: 5px;
+}
+.patent-notice p {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.empty-history {
+  font-size: 13px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 20px;
+}
+
+/* ── Loading animation ── */
+.analyzing {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.analyzing.show { display: flex; }
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid rgba(0,212,255,.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .main-grid { grid-template-columns: 1fr; }
+  .stat-bar  { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🛡</div>
+      <div class="logo-text">
+        <h1>SpamGuard</h1>
+        <p>ALLWE Detection Engine v1.0</p>
+      </div>
+    </div>
+    <a href="/bulk" style="text-decoration:none;">
+      <div class="header-badge" style="cursor:pointer;background:rgba(0,255,157,.08);border-color:rgba(0,255,157,.25);color:var(--green);">⚡ BULK ANALYZER</div>
+    </a>
+    <div class="header-badge">SYSTEM ACTIVE</div>
+  </header>
+
+  <!-- STAT BAR -->
+  <div class="stat-bar">
+    <div class="stat-card">
+      <div class="stat-label">Emails Analyzed</div>
+      <div class="stat-value" id="stat-total">0</div>
+      <div class="stat-sub">this session</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Spam Detected</div>
+      <div class="stat-value" id="stat-spam" style="color:var(--red)">0</div>
+      <div class="stat-sub">flagged</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Spam Rate</div>
+      <div class="stat-value" id="stat-rate" style="color:var(--orange)">0%</div>
+      <div class="stat-sub">overall</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">ML Models</div>
+      <div class="stat-value" style="color:var(--accent)">4</div>
+      <div class="stat-sub">hybrid ensemble</div>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="main-grid">
+
+    <!-- LEFT: Input + Result -->
+    <div style="display:flex;flex-direction:column;gap:20px;">
+
+      <div class="panel">
+        <div class="panel-header"><div class="dot"></div>Email Analyzer</div>
+        <div class="panel-body">
+
+          <div class="input-label">Paste Email or Message Text</div>
+          <textarea id="email-input" placeholder="Paste any email, SMS, or message text here to analyze for spam...
+
+Example: WINNER!! You have been selected for a £900 prize. Call now to claim!"></textarea>
+
+          <div class="quick-tests">
+            <div class="quick-label">Quick Test Samples</div>
+            <div class="chips">
+              <button class="chip spam-chip" onclick="loadSample('spam1')">⚠ Lottery Spam</button>
+              <button class="chip spam-chip" onclick="loadSample('spam2')">⚠ Phishing</button>
+              <button class="chip spam-chip" onclick="loadSample('spam3')">⚠ Offer Spam</button>
+              <button class="chip" onclick="loadSample('ham1')">✓ Work Email</button>
+              <button class="chip" onclick="loadSample('ham2')">✓ Personal</button>
+              <button class="chip" onclick="loadSample('ham3')">✓ Meeting</button>
+            </div>
+          </div>
+
+          <button class="analyze-btn" id="analyze-btn" onclick="analyze()">
+            ▶ ANALYZE EMAIL
+          </button>
+        </div>
+      </div>
+
+      <!-- Result -->
+      <div class="panel" id="result-panel" style="display:none;">
+        <div class="panel-header"><div class="dot"></div>Analysis Result</div>
+        <div class="panel-body">
+
+          <div class="analyzing" id="analyzing-indicator">
+            <div class="spinner"></div>RUNNING ALLWE ENSEMBLE...
+          </div>
+
+          <div id="result-content" style="display:none;">
+
+            <!-- Verdict -->
+            <div class="verdict" id="verdict-banner">
+              <div class="verdict-icon" id="verdict-icon"></div>
+              <div class="verdict-text">
+                <h2 id="verdict-title"></h2>
+                <p id="verdict-sub"></p>
+              </div>
+              <span class="risk-badge" id="risk-badge"></span>
+            </div>
+
+            <!-- Confidence Arc -->
+            <div class="conf-arc-wrap">
+              <canvas id="conf-arc" width="90" height="90" class="arc-canvas"></canvas>
+              <div class="conf-details">
+                <h3 id="conf-value"></h3>
+                <p>Ensemble Confidence</p>
+                <p style="margin-top:6px;font-size:12px;" id="ensemble-prob-label"></p>
+              </div>
+              <div class="latency" id="latency-display"></div>
+            </div>
+
+            <!-- Model Breakdown -->
+            <div class="model-breakdown">
+              <div class="mb-title">Per-Model Spam Probability</div>
+              <div id="model-bars"></div>
+            </div>
+
+            <!-- Spam Words -->
+            <div class="spam-words" id="spam-words-section" style="display:none;">
+              <div class="sw-title">⚡ Spam Signal Words Detected</div>
+              <div class="sw-chips" id="spam-word-chips"></div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: History + Weights + Patent -->
+    <div class="right-col">
+
+      <div class="panel">
+        <div class="panel-header"><div class="dot"></div>Scan History</div>
+        <div class="panel-body" style="padding:14px;">
+          <div class="history-list" id="history-list">
+            <div class="empty-history">No emails analyzed yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><div class="dot"></div>Ensemble Weights (ALLWE)</div>
+        <div class="panel-body">
+          <div class="weights-canvas-wrap">
+            <canvas id="weights-donut" width="130" height="130"></canvas>
+            <div class="weights-legend" id="weights-legend"></div>
+          </div>
+          <p style="font-size:11.5px;color:var(--text-dim);text-align:center;margin-top:8px;line-height:1.5;">
+            Weights optimized via scipy.minimize<br>to minimize log-loss on validation set
+          </p>
+        </div>
+      </div>
+
+      <div class="patent-notice">
+        <div class="icon">⚖️</div>
+        <div>
+          <h4>Patent-Pending Architecture</h4>
+          <p>
+            ALLWE (Adaptive Log-Loss Weighted Ensemble): Novel method of dynamically optimizing 4-model ensemble weights by minimizing binary cross-entropy loss on a held-out validation set, producing calibrated probabilistic spam classifications with explainability layer.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Sample emails ────────────────────────────────────────────
+const SAMPLES = {
+  spam1: "WINNER!! As a valued network customer you have been selected to receive a £900 prize reward! To claim call 09061701461. Claim code KL341. Valid 12 hours only. 83435",
+  spam2: "URGENT: Your account has been compromised. Verify your identity immediately at http://secure-bank-verification.xyz or your account will be suspended within 24 hours. Click NOW.",
+  spam3: "Congratulations! You've WON a FREE iPhone 15! You were selected as today's lucky winner. Click here to claim your FREE prize before it expires! Limited time ONLY. Reply YES",
+  ham1: "Hi team, just a reminder that the Q3 budget review meeting is scheduled for Thursday at 2pm in conference room B. Please bring your department reports. Let me know if you have any questions.",
+  ham2: "Hey, are you free this weekend? Was thinking we could catch up over coffee. Let me know what works for you!",
+  ham3: "Please find attached the revised project proposal. I've updated the timeline based on our discussion yesterday and addressed the feedback from the client. Can you review before Friday?",
+};
+
+function loadSample(key) {
+  document.getElementById('email-input').value = SAMPLES[key];
+}
+
+// ── Stats counters ────────────────────────────────────────────
+let totalAnalyzed = 0, spamCount = 0;
+
+function updateStats(result) {
+  totalAnalyzed = result.stats.total_analyzed;
+  spamCount = Math.round(totalAnalyzed * result.stats.overall_spam_rate / 100);
+  document.getElementById('stat-total').textContent = totalAnalyzed;
+  document.getElementById('stat-spam').textContent  = spamCount;
+  document.getElementById('stat-rate').textContent  = result.stats.overall_spam_rate + '%';
+}
+
+// ── Analyze ───────────────────────────────────────────────────
+async function analyze() {
+  const text = document.getElementById('email-input').value.trim();
+  if (!text) { alert('Please paste email text first.'); return; }
+
+  const btn = document.getElementById('analyze-btn');
+  btn.disabled = true;
+
+  const panel = document.getElementById('result-panel');
+  panel.style.display = 'block';
+  document.getElementById('analyzing-indicator').classList.add('show');
+  document.getElementById('result-content').style.display = 'none';
+
+  try {
+    const res  = await fetch('/analyze', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+
+    document.getElementById('analyzing-indicator').classList.remove('show');
+    document.getElementById('result-content').style.display = 'block';
+
+    renderResult(data);
+    updateStats(data);
+    renderHistory(data.history || []);
+  } catch(e) {
+    alert('Error connecting to server. Is app.py running?');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Render Result ─────────────────────────────────────────────
+function renderResult(d) {
+  const isSpam = d.label === 'SPAM';
+
+  // Verdict
+  const banner = document.getElementById('verdict-banner');
+  banner.className = 'verdict ' + (isSpam ? 'spam' : 'ham');
+  document.getElementById('verdict-icon').textContent   = isSpam ? '🚨' : '✅';
+  document.getElementById('verdict-title').textContent  = isSpam ? 'SPAM DETECTED' : 'LEGITIMATE MAIL';
+  document.getElementById('verdict-sub').textContent    = isSpam
+    ? `Ensemble spam probability: ${d.ensemble_prob}%`
+    : `Ensemble spam probability: ${d.ensemble_prob}% — Safe to open`;
+
+  const rb = document.getElementById('risk-badge');
+  rb.textContent = d.risk_level;
+  rb.className   = 'risk-badge risk-' + d.risk_level;
+
+  // Confidence arc
+  drawArc('conf-arc', d.confidence / 100, isSpam ? '#ff3b5c' : '#00ff9d');
+  document.getElementById('conf-value').textContent      = d.confidence.toFixed(1) + '%';
+  document.getElementById('ensemble-prob-label').textContent = `Spam score: ${d.ensemble_prob}%`;
+  document.getElementById('latency-display').innerHTML  =
+    `${d.latency_ms}ms<br><span style="color:var(--text-dim)">latency</span>`;
+
+  // Model bars
+  const container = document.getElementById('model-bars');
+  container.innerHTML = '';
+  Object.entries(d.model_scores).forEach(([name, score]) => {
+    const div = document.createElement('div');
+    div.className = 'mb-row';
+    const barClass = isSpam ? 'spam-bar' : '';
+    div.innerHTML = `
+      <div class="mb-row-top">
+        <span class="mb-name">${name}</span>
+        <span class="mb-score">${score.toFixed(1)}%</span>
+      </div>
+      <div class="mb-bar-bg">
+        <div class="mb-bar-fill ${barClass}" style="width:0%" data-target="${score}"></div>
+      </div>`;
+    container.appendChild(div);
+  });
+  // Animate bars
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.mb-bar-fill').forEach(el => {
+      el.style.width = el.dataset.target + '%';
+    });
+  });
+
+  // Spam words
+  const swSec = document.getElementById('spam-words-section');
+  if (isSpam && d.top_spam_words && d.top_spam_words.length > 0) {
+    swSec.style.display = 'block';
+    document.getElementById('spam-word-chips').innerHTML =
+      d.top_spam_words.map(w => `<span class="sw-chip">${w}</span>`).join('');
+  } else {
+    swSec.style.display = 'none';
+  }
+}
+
+// ── History ────────────────────────────────────────────────────
+function renderHistory(items) {
+  const list = document.getElementById('history-list');
+  if (!items || items.length === 0) {
+    list.innerHTML = '<div class="empty-history">No emails analyzed yet.</div>';
+    return;
+  }
+  list.innerHTML = items.map(item => `
+    <div class="history-item">
+      <div class="hi-dot ${item.label.toLowerCase()}"></div>
+      <span class="hi-text">${item.text}</span>
+      <span class="hi-conf">${item.conf.toFixed(0)}%</span>
+    </div>
+  `).join('');
+}
+
+// ── Canvas: Arc (confidence gauge) ────────────────────────────
+function drawArc(id, fraction, color) {
+  const canvas = document.getElementById(id);
+  const ctx    = canvas.getContext('2d');
+  const cx = canvas.width / 2, cy = canvas.height / 2, r = 36;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Background arc
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,.07)';
+  ctx.lineWidth = 7;
+  ctx.stroke();
+
+  // Filled arc
+  const start = -Math.PI / 2;
+  const end   = start + fraction * Math.PI * 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, start, end);
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = 7;
+  ctx.lineCap     = 'round';
+  ctx.shadowColor = color;
+  ctx.shadowBlur  = 10;
+  ctx.stroke();
+}
+
+// ── Canvas: Donut (ensemble weights) ──────────────────────────
+function drawWeightsDonut(weights) {
+  const canvas = document.getElementById('weights-donut');
+  const ctx    = canvas.getContext('2d');
+  const cx = canvas.width / 2, cy = canvas.height / 2, r = 48;
+  const colors = ['#ff3b5c','#00d4ff','#00ff9d','#ffd60a'];
+  const names  = Object.keys(weights);
+  const vals   = Object.values(weights);
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  let startAngle = -Math.PI / 2;
+  vals.forEach((v, i) => {
+    const slice = (v / 100) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startAngle, startAngle + slice);
+    ctx.closePath();
+    ctx.fillStyle = colors[i];
+    ctx.globalAlpha = .8;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    startAngle += slice;
+  });
+
+  // Center hole
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.56, 0, Math.PI * 2);
+  ctx.fillStyle = '#0d1424';
+  ctx.fill();
+
+  // Legend
+  const legend = document.getElementById('weights-legend');
+  const shortNames = ['NB', 'LR', 'RF', 'GB'];
+  legend.innerHTML = names.map((n, i) => `
+    <div class="wl-row">
+      <div class="wl-dot" style="background:${colors[i]}"></div>
+      <span class="wl-name">${shortNames[i]}</span>
+      <span class="wl-val">${vals[i].toFixed(1)}%</span>
+    </div>
+  `).join('');
+}
+
+// ── Init: load weights from server ────────────────────────────
+async function init() {
+  // Draw placeholder donut with equal weights
+  const placeholderWeights = {
+    'Naive Bayes': 25, 'Logistic Regression': 25,
+    'Random Forest': 25, 'Gradient Boosting': 25
+  };
+  drawWeightsDonut(placeholderWeights);
+
+  // Analyze on Enter (Ctrl+Enter)
+  document.getElementById('email-input').addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'Enter') analyze();
+  });
+}
+
+// ── Override renderResult to also draw updated donut ─────────
+const _renderResult = renderResult;
+renderResult = function(d) {
+  _renderResult(d);
+  if (d.ensemble_weights) drawWeightsDonut(d.ensemble_weights);
+};
+
+init();
+</script>
+</body>
+</html>
